@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>韓国探検！ワールドアドベンチャー（全13問）</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800&display=swap');
+        body { font-family: 'M PLUS Rounded 1c', sans-serif; touch-action: manipulation; user-select: none; }
+        canvas { image-rendering: pixelated; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center justify-center p-2 sm:p-4">
+
+    <div class="w-full max-w-4xl bg-gray-800 rounded-3xl p-4 shadow-2xl border-4 border-blue-500 relative">
+        <div class="flex justify-between items-center mb-2 px-2 text-sm sm:text-base">
+            <div class="flex items-center gap-2">
+                <span class="bg-blue-600 text-white font-extrabold px-3 py-1 rounded-full text-xs sm:text-sm" id="stage-badge">STAGE 1/13</span>
+                <span class="font-bold text-red-400" id="country-title">🇰🇷 韓国を知ろう</span>
+            </div>
+            <div class="flex items-center gap-4 font-bold">
+                <span class="text-blue-400"><i class="fa-solid fa-circle-check me-1"></i> 正解: <span id="correct-count">0</span> / 13</span>
+                <span class="text-yellow-400"><i class="fa-solid fa-star me-1"></i> SCORE: <span id="score-val">0</span></span>
+            </div>
+        </div>
+
+        <div class="relative w-full aspect-[16/9] bg-black rounded-2xl overflow-hidden border-2 border-gray-700">
+            <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+
+            <div id="start-overlay" class="absolute inset-0 bg-black/85 flex flex-col items-center justify-center p-6 text-center z-10">
+                <div class="text-6xl mb-3 animate-bounce">🇰🇷</div>
+                <h1 class="text-2xl sm:text-4xl font-extrabold text-blue-400 mb-2">韓国探検クイズ！</h1>
+                <p class="text-xs sm:text-sm text-gray-300 mb-6 max-w-md">
+                    キャラクターを操作して正解の扉（A/B/C）に入ろう！<br>
+                    全13問のクイズに挑戦！間違えても最後まで進めるよ！（所要時間：約5〜7分）
+                </p>
+                <button onclick="startGame()" class="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-lg sm:text-xl rounded-2xl shadow-lg border-2 border-red-400 transform active:scale-95 transition-all">
+                    冒険をはじめる！ <i class="fa-solid fa-play ms-2"></i>
+                </button>
+            </div>
+
+            <div id="result-overlay" class="hidden absolute inset-0 bg-black/90 flex flex-col items-center justify-center p-6 text-center z-10">
+                <i id="result-icon" class="fa-solid fa-trophy text-6xl text-yellow-400 mb-3"></i>
+                <h2 id="result-title" class="text-3xl font-extrabold text-white mb-2">ゴール！全13問クリア！</h2>
+                <p id="result-msg" class="text-gray-300 mb-6 text-sm">韓国物知りマスターになりました！</p>
+                <button onclick="restartGame()" class="px-6 py-3 bg-blue-600 text-white font-extrabold text-lg rounded-2xl shadow-lg border-2 border-red-400 transform active:scale-95 transition-all">
+                    もう一度あそぶ <i class="fa-solid fa-rotate-right ms-1"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="mt-4 grid grid-cols-3 gap-2 sm:hidden">
+            <button id="btn-left" class="bg-gray-700 active:bg-blue-500 py-4 rounded-xl text-2xl font-bold border-b-4 border-gray-900 active:border-blue-700"><i class="fa-solid fa-arrow-left"></i></button>
+            <button id="btn-jump" class="bg-blue-600 active:bg-blue-500 text-white py-4 rounded-xl text-2xl font-bold border-b-4 border-blue-800">JUMP <i class="fa-solid fa-arrow-up ms-1"></i></button>
+            <button id="btn-right" class="bg-gray-700 active:bg-blue-500 py-4 rounded-xl text-2xl font-bold border-b-4 border-gray-900 active:border-blue-700"><i class="fa-solid fa-arrow-right"></i></button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 800; canvas.height = 450;
+
+        // 正解位置：C, A, B, C, A, B, C, A, B, C, A, B, C に分散
+        const stages = [
+            { theme: "🏛️ 首都の知識", question: "【第1問】韓国の首都の名前は？", options: [{ label: "A", text: "プサン", correct: false }, { label: "B", text: "チェジュ", correct: false }, { label: "C", text: "ソウル", correct: true }], explanation: "正解はCのソウル！大きな川（漢江）が流れる大都市だよ！" },
+            { theme: "🇰🇷 国旗の由来", question: "【第2問】「太極旗」の真ん中にある円の色は？", options: [{ label: "A", text: "赤と青", correct: true }, { label: "B", text: "黄と緑", correct: false }, { label: "C", text: "黒と白", correct: false }], explanation: "正解はAの赤と青！調和とバランスを表しているんだよ！" },
+            { theme: "🥬 伝統料理", question: "【第3問】唐辛子やニンニクで漬けた、韓国の代表的な発酵食品は？", options: [{ label: "A", text: "ザーサイ", correct: false }, { label: "B", text: "キムチ", correct: true }, { label: "C", text: "ピクルス", correct: false }], explanation: "正解はBのキムチ！体に良い乳酸菌がたっぷりの伝統料理だよ！" },
+            { theme: "💬 言語と挨拶", question: "【第4問】韓国語で「こんにちは」を表す丁寧な言葉は？", options: [{ label: "A", text: "サワディー", correct: false }, { label: "B", text: "ニーハオ", correct: false }, { label: "C", text: "アニョハセヨ", correct: true }], explanation: "正解はCのアニョハセヨ！「安寧ですか？」という意味の素敵な挨拶だよ！" },
+            { theme: "🔤 固有の文字", question: "【第5問】丸や棒を組み合わせた独自文字の名前は？", options: [{ label: "A", text: "ハングル", correct: true }, { label: "B", text: "アルファベット", correct: false }, { label: "C", text: "ヒエログリフ", correct: false }], explanation: "正解はAのハングル！15世紀に世宗大王が作った文字だよ！" },
+            { theme: "🍢 人気の屋台料理", question: "【第6問】細長いお餅（トック）を甘辛いタレで炒めた人気料理は？", options: [{ label: "A", text: "パスタ", correct: false }, { label: "B", text: "トッポギ", correct: true }, { label: "C", text: "ヤキソバ", correct: false }], explanation: "正解はBのトッポギ！屋台やお店で大人気のソウルフードだよ！" },
+            { theme: "👗 伝統衣装", question: "【第7問】鮮やかな色合いが美しい、韓国の伝統的な衣装は？", options: [{ label: "A", text: "アオザイ", correct: false }, { label: "B", text: "キモノ", correct: false }, { label: "C", text: "チマチョゴリ", correct: true }], explanation: "正解はCのチマチョゴリ！お正月や結婚式などの行事で着られるよ！" },
+            { theme: "🎶 伝統芸能", question: "【第8問】太鼓の音に合わせて歌い手が物語を語る伝統歌劇は？", options: [{ label: "A", text: "パンソリ", correct: true }, { label: "B", text: "オペラ", correct: false }, { label: "C", text: "ミュージカル", correct: false }], explanation: "正解はAのパンソリ！1人の歌い手と1人の太鼓打ちで紡ぐ伝統芸能だよ！" },
+            { theme: "🏯 古い王宮", question: "【第9問】ソウル市内にある最も有名な朝鮮王朝の王宮は？", options: [{ label: "A", text: "紫禁城", correct: false }, { label: "B", text: "景福宮", correct: true }, { label: "C", text: "アハンブラ宮殿", correct: false }], explanation: "正解はBの景福宮（キョンボックン）！壮大な門や建物が見事な観光地だよ！" },
+            { theme: "🥋 国技・武術", question: "【第10問】華やかな足技が特徴的な韓国発祥の競技は？", options: [{ label: "A", text: "柔道", correct: false }, { label: "B", text: "空手", correct: false }, { label: "C", text: "テコンドー", correct: true }], explanation: "正解はCのテコンドー！世界中で愛されている韓国の国技だよ！" },
+            { theme: "🪙 お金の単位", question: "【第11問】韓国で使われている通貨の名前は？", options: [{ label: "A", text: "ウォン", correct: true }, { label: "B", text: "バーツ", correct: false }, { label: "C", text: "ルピー", correct: false }], explanation: "正解はAのウォン！記号は「₩」と表現されるよ！" },
+            { theme: "🏝️ 有名な島", question: "【第12問】最南端にある自然豊かなリゾート島は？", options: [{ label: "A", text: "バリ島", correct: false }, { label: "B", text: "チェジュ島", correct: true }, { label: "C", text: "ハワイ島", correct: false }], explanation: "正解はBのチェジュ島（済州島）！美しい自然やみかんが有名な島だよ！" },
+            { theme: "🎤 ポップカルチャー", question: "【第13問】世界中で大ヒットしているポップ音楽の呼び名は？", options: [{ label: "A", text: "J-POP", correct: false }, { label: "B", text: "ロック", correct: false }, { label: "C", text: "K-POP", correct: true }], explanation: "正解はCのK-POP！ダンスや歌のクオリティが高く世界中で大人気だよ！" }
+        ];
+
+        let currentStageIdx = 0, score = 0, correctAnswers = 0, gameState = 'START';
+        const player = { x: 80, y: 280, width: 32, height: 48, vx: 0, vy: 0, speed: 5, jumpPower: -12, gravity: 0.6, isGrounded: false, direction: 'right' };
+        const keys = { left: false, right: false, up: false };
+        const doors = [{ label: 'A', x: 220, y: 260, width: 50, height: 70 }, { label: 'B', x: 420, y: 260, width: 50, height: 70 }, { label: 'C', x: 620, y: 260, width: 50, height: 70 }];
+        let expText = "", expTimer = 0;
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === ' ') { keys.up = true; handleEnterDoor(); }
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === ' ') keys.up = false;
+        });
+
+        document.getElementById('btn-left').addEventListener('touchstart', (e) => { e.preventDefault(); keys.left = true; });
+        document.getElementById('btn-left').addEventListener('touchend', (e) => { e.preventDefault(); keys.left = false; });
+        document.getElementById('btn-right').addEventListener('touchstart', (e) => { e.preventDefault(); keys.right = true; });
+        document.getElementById('btn-right').addEventListener('touchend', (e) => { e.preventDefault(); keys.right = false; });
+        document.getElementById('btn-jump').addEventListener('touchstart', (e) => { e.preventDefault(); keys.up = true; handleEnterDoor(); });
+        document.getElementById('btn-jump').addEventListener('touchend', (e) => { e.preventDefault(); keys.up = false; });
+
+        function startGame() { document.getElementById('start-overlay').classList.add('hidden'); document.getElementById('result-overlay').classList.add('hidden'); currentStageIdx = 0; score = 0; correctAnswers = 0; resetPlayerPos(); gameState = 'PLAYING'; updateUI(); }
+        function restartGame() { startGame(); }
+        function resetPlayerPos() { player.x = 80; player.y = 280; player.vx = 0; player.vy = 0; }
+        function updateUI() { document.getElementById('stage-badge').innerText = `STAGE ${currentStageIdx + 1}/${stages.length}`; document.getElementById('country-title').innerText = stages[currentStageIdx].theme; document.getElementById('correct-count').innerText = correctAnswers; document.getElementById('score-val').innerText = score; }
+
+        function handleEnterDoor() {
+            if (gameState !== 'PLAYING') return;
+            const currentStage = stages[currentStageIdx];
+            doors.forEach((door, idx) => {
+                if (player.x + player.width > door.x && player.x < door.x + door.width) {
+                    const selectedOpt = currentStage.options[idx];
+                    if (selectedOpt.correct) { score += 100; correctAnswers++; expText = "⭕️ 正解！ " + currentStage.explanation; }
+                    else { expText = "❌ おしい！ " + currentStage.explanation; }
+                    gameState = 'EXPLANATION'; expTimer = 170; updateUI();
+                }
+            });
+        }
+
+        function update() {
+            if (gameState !== 'PLAYING') return;
+            if (keys.left) { player.vx = -player.speed; player.direction = 'left'; }
+            else if (keys.right) { player.vx = player.speed; player.direction = 'right'; }
+            else player.vx = 0;
+
+            if (keys.up && player.isGrounded) { player.vy = player.jumpPower; player.isGrounded = false; }
+            player.vy += player.gravity; player.x += player.vx; player.y += player.vy;
+            if (player.y + player.height >= 330) { player.y = 330 - player.height; player.vy = 0; player.isGrounded = true; }
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+        }
+
+        function draw() {
+            ctx.fillStyle = '#1e40af'; ctx.fillRect(0, 0, canvas.width, 330);
+            ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(100, 80, 25, 0, Math.PI * 2); ctx.arc(125, 70, 30, 0, Math.PI * 2); ctx.arc(150, 80, 25, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#ef4444'; ctx.fillRect(0, 330, canvas.width, 15); ctx.fillStyle = '#1e1b4b'; ctx.fillRect(0, 345, canvas.width, 105);
+
+            const stage = stages[currentStageIdx];
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; ctx.fillRect(20, 15, canvas.width - 40, 75);
+            ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 3; ctx.strokeRect(20, 15, canvas.width - 40, 75);
+            ctx.fillStyle = '#ffffff'; ctx.font = 'bold 17px "M PLUS Rounded 1c"'; ctx.textAlign = 'center'; ctx.fillText(stage.question, canvas.width / 2, 58);
+
+            doors.forEach((door, idx) => {
+                const opt = stage.options[idx];
+                ctx.fillStyle = '#1d4ed8'; ctx.fillRect(door.x, door.y, door.width, door.height);
+                ctx.strokeStyle = '#93c5fd'; ctx.lineWidth = 3; ctx.strokeRect(door.x, door.y, door.width, door.height);
+                ctx.fillStyle = '#93c5fd'; ctx.font = 'bold 24px "M PLUS Rounded 1c"'; ctx.fillText(door.label, door.x + door.width / 2, door.y - 10);
+                ctx.fillStyle = '#ffffff'; ctx.fillRect(door.x - 48, door.y - 65, 146, 45);
+                ctx.fillStyle = '#1f2937'; ctx.font = 'bold 12px "M PLUS Rounded 1c"'; ctx.fillText(opt.text, door.x + 25, door.y - 38);
+            });
+
+            ctx.fillStyle = '#3b82f6'; ctx.fillRect(player.x, player.y + 16, player.width, 32);
+            ctx.fillStyle = '#fca5a5'; ctx.fillRect(player.x + 4, player.y, 24, 20);
+            ctx.fillStyle = '#ef4444'; ctx.fillRect(player.x, player.y - 4, 32, 10);
+
+            if (gameState === 'EXPLANATION') {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.9)'; ctx.fillRect(30, 110, canvas.width - 60, 210);
+                ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 4; ctx.strokeRect(30, 110, canvas.width - 60, 210);
+                ctx.fillStyle = '#ffffff'; ctx.font = 'bold 17px "M PLUS Rounded 1c"'; ctx.fillText(expText, canvas.width / 2, 195);
+                ctx.fillStyle = '#93c5fd'; ctx.font = 'bold 14px "M PLUS Rounded 1c"'; ctx.fillText("次のステージへ向かっています...", canvas.width / 2, 270);
+                expTimer--;
+                if (expTimer <= 0) {
+                    if (currentStageIdx + 1 < stages.length) { currentStageIdx++; resetPlayerPos(); gameState = 'PLAYING'; updateUI(); }
+                    else endGame();
+                }
+            }
+        }
+
+        function endGame() {
+            gameState = 'CLEAR';
+            const overlay = document.getElementById('result-overlay');
+            document.getElementById('result-title').innerText = "全13問ゴール！";
+            document.getElementById('result-msg').innerText = `おつかれさまでした！ 13問中 ${correctAnswers} 問正解！（スコア: ${score}点）`;
+            overlay.classList.remove('hidden');
+        }
+
+        function gameLoop() { update(); draw(); requestAnimationFrame(gameLoop); }
+        gameLoop();
+    </script>
+</body>
+</html>

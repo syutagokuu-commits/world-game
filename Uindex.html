@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ウクライナ探検！ワールドアドベンチャー（全13問）</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800&display=swap');
+        body { font-family: 'M PLUS Rounded 1c', sans-serif; touch-action: manipulation; user-select: none; }
+        canvas { image-rendering: pixelated; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center justify-center p-2 sm:p-4">
+
+    <!-- メインコンテナ -->
+    <div class="w-full max-w-4xl bg-gray-800 rounded-3xl p-4 shadow-2xl border-4 border-yellow-400 relative">
+        
+        <!-- ヘッダー情報 -->
+        <div class="flex justify-between items-center mb-2 px-2 text-sm sm:text-base">
+            <div class="flex items-center gap-2">
+                <span class="bg-yellow-400 text-gray-900 font-extrabold px-3 py-1 rounded-full text-xs sm:text-sm" id="stage-badge">STAGE 1/13</span>
+                <span class="font-bold text-yellow-300" id="country-title">🇺🇦 ウクライナを知ろう</span>
+            </div>
+            <div class="flex items-center gap-4 font-bold">
+                <span class="text-blue-400"><i class="fa-solid fa-circle-check me-1"></i> 正解: <span id="correct-count">0</span> / 13</span>
+                <span class="text-green-400"><i class="fa-solid fa-star me-1"></i> SCORE: <span id="score-val">0</span></span>
+            </div>
+        </div>
+
+        <!-- Canvas ゲーム画面 -->
+        <div class="relative w-full aspect-[16/9] bg-black rounded-2xl overflow-hidden border-2 border-gray-700">
+            <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+
+            <!-- スタート・オーバーレイ -->
+            <div id="start-overlay" class="absolute inset-0 bg-black/85 flex flex-col items-center justify-center p-6 text-center z-10">
+                <div class="text-6xl mb-3 animate-bounce">🇺🇦</div>
+                <h1 class="text-2xl sm:text-4xl font-extrabold text-yellow-300 mb-2">ウクライナ探検クイズ！</h1>
+                <p class="text-xs sm:text-sm text-gray-300 mb-6 max-w-md">
+                    キャラクターを操作して正解の扉（A/B/C）に入ろう！<br>
+                    全13問のクイズに挑戦！間違えても最後まで進めるよ！（所要時間：約5〜7分）
+                </p>
+                <button onclick="startGame()" class="px-8 py-4 bg-yellow-400 hover:bg-yellow-300 text-gray-900 font-extrabold text-lg sm:text-xl rounded-2xl shadow-lg border-2 border-blue-500 transform active:scale-95 transition-all">
+                    冒険をはじめる！ <i class="fa-solid fa-play ms-2"></i>
+                </button>
+            </div>
+
+            <!-- 結果オーバーレイ -->
+            <div id="result-overlay" class="hidden absolute inset-0 bg-black/90 flex flex-col items-center justify-center p-6 text-center z-10">
+                <i id="result-icon" class="fa-solid fa-trophy text-6xl text-yellow-400 mb-3"></i>
+                <h2 id="result-title" class="text-3xl font-extrabold text-white mb-2">ゴール！全13問クリア！</h2>
+                <p id="result-msg" class="text-gray-300 mb-6 text-sm">ウクライナ物知りマスターになりました！</p>
+                <button onclick="restartGame()" class="px-6 py-3 bg-yellow-400 text-gray-900 font-extrabold text-lg rounded-2xl shadow-lg border-2 border-blue-500 transform active:scale-95 transition-all">
+                    もう一度あそぶ <i class="fa-solid fa-rotate-right ms-1"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- タッチ用操作ボタン（スマホ向け） -->
+        <div class="mt-4 grid grid-cols-3 gap-2 sm:hidden">
+            <button id="btn-left" class="bg-gray-700 active:bg-yellow-500 py-4 rounded-xl text-2xl font-bold border-b-4 border-gray-900 active:border-yellow-700">
+                <i class="fa-solid fa-arrow-left"></i>
+            </button>
+            <button id="btn-jump" class="bg-yellow-500 active:bg-yellow-400 text-gray-900 py-4 rounded-xl text-2xl font-bold border-b-4 border-yellow-700">
+                JUMP <i class="fa-solid fa-arrow-up ms-1"></i>
+            </button>
+            <button id="btn-right" class="bg-gray-700 active:bg-yellow-500 py-4 rounded-xl text-2xl font-bold border-b-4 border-gray-900 active:border-yellow-700">
+                <i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </div>
+
+        <!-- 操作説明 (PC用) -->
+        <div class="hidden sm:flex justify-between items-center text-xs text-gray-400 mt-3 px-2">
+            <span><i class="fa-solid fa-keyboard me-1"></i> 移動: <b>[←] [→]</b> または <b>[A] [D]</b></span>
+            <span><i class="fa-solid fa-keyboard me-1"></i> ジャンプ: <b>[SPACE]</b> または <b>[↑]</b></span>
+            <span><i class="fa-solid fa-door-open me-1"></i> 扉の前で [↑] キーで入る</span>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = 800;
+        canvas.height = 450;
+
+        // 正解位置：C, B, A, C, A, B, C, A, B, C, A, B, C に分散
+        const stages = [
+            {
+                theme: "🏛️ 首都の知識",
+                question: "【第1問】ウクライナの首都の名前は？",
+                options: [
+                    { label: "A", text: "ワルシャワ", correct: false },
+                    { label: "B", text: "ブダペスト", correct: false },
+                    { label: "C", text: "キーウ", correct: true }
+                ],
+                explanation: "正解はCのキーウ！歴史ある美しい都市だよ！"
+            },
+            {
+                theme: "🇺🇦 国旗の由来",
+                question: "【第2問】ウクライナの国旗の青と黄色は何を表している？",
+                options: [
+                    { label: "A", text: "海と太陽", correct: false },
+                    { label: "B", text: "青空と小麦畑", correct: true },
+                    { label: "C", text: "川とバナナ", correct: false }
+                ],
+                explanation: "正解はBの青空と小麦畑！ウクライナは小麦の産地なんだ！"
+            },
+            {
+                theme: "🍲 伝統料理",
+                question: "【第3問】ウクライナ発祥の有名な赤色の野菜スープは？",
+                options: [
+                    { label: "A", text: "ボルシチ", correct: true },
+                    { label: "B", text: "ミネストローネ", correct: false },
+                    { label: "C", text: "トムヤムクン", correct: false }
+                ],
+                explanation: "正解はAのボルシチ！ビート（赤かぶに似た野菜）を使った伝統料理だよ！"
+            },
+            {
+                theme: "🌻 国の花",
+                question: "【第4問】ウクライナの国花（シンボルの花）はどれ？",
+                options: [
+                    { label: "A", text: "チューリップ", correct: false },
+                    { label: "B", text: "サクラ", correct: false },
+                    { label: "C", text: "ヒマワリ", correct: true }
+                ],
+                explanation: "正解はCのヒマワリ！一面のヒマワリ畑がとても有名だよ！"
+            },
+            {
+                theme: "🎨 伝統工芸",
+                question: "【第5問】伝統的な模様入りイースターエッグの名前は？",
+                options: [
+                    { label: "A", text: "ピサンカ", correct: true },
+                    { label: "B", text: "マトリョーシカ", correct: false },
+                    { label: "C", text: "オリガミ", correct: false }
+                ],
+                explanation: "正解はAのピサンカ！ロウを使って卵に細かな模様を描くんだ！"
+            },
+            {
+                theme: "👕 伝統衣装",
+                question: "【第6問】美しい刺しゅうが施されたウクライナの伝統衣装は？",
+                options: [
+                    { label: "A", text: "チマチョゴリ", correct: false },
+                    { label: "B", text: "ヴィシヴァンカ", correct: true },
+                    { label: "C", text: "アオザイ", correct: false }
+                ],
+                explanation: "正解はBのヴィシヴァンカ！魔除けや幸せを願う刺しゅうが施されているよ！"
+            },
+            {
+                theme: "💬 言語と挨拶",
+                question: "【第7問】ウクライナ語で「こんにちは」を表す言葉は？",
+                options: [
+                    { label: "A", text: "ボンジュール", correct: false },
+                    { label: "B", text: "ニーハオ", correct: false },
+                    { label: "C", text: "ドブリィ・デニ", correct: true }
+                ],
+                explanation: "正解はCのドブリィ・デニ！とても丁寧な挨拶だよ！"
+            },
+            {
+                theme: "✈️ 世界一の記録",
+                question: "【第8問】ウクライナで作られた世界最大の飛行機の名前は？",
+                options: [
+                    { label: "A", text: "ムリーヤ", correct: true },
+                    { label: "B", text: "ジャンボ747", correct: false },
+                    { label: "C", text: "コンコルド", correct: false }
+                ],
+                explanation: "正解はAのムリーヤ！ウクライナ語で「夢」という意味だよ！"
+            },
+            {
+                theme: "🥟 伝統の水餃子",
+                question: "【第9問】もちもちの生地で具を包む伝統的な水餃子風の料理は？",
+                options: [
+                    { label: "A", text: "パスタ", correct: false },
+                    { label: "B", text: "ヴァレーニキ", correct: true },
+                    { label: "C", text: "タコス", correct: false }
+                ],
+                explanation: "正解はBのヴァレーニキ！ジャガイモやチーズ、果物などを包むよ！"
+            },
+            {
+                theme: "🌊 地理と海",
+                question: "【第10問】ウクライナの南側に面している海の名前は？",
+                options: [
+                    { label: "A", text: "地中海", correct: false },
+                    { label: "B", text: "日本海", correct: false },
+                    { label: "C", text: "黒海", correct: true }
+                ],
+                explanation: "正解はCの黒海！有名な港町オデーサが面している大きな海だよ！"
+            },
+            {
+                theme: "🌲 観光名所",
+                question: "【第11問】緑の木々がアーチを作る「愛のトンネル」がある国は？",
+                options: [
+                    { label: "A", text: "ウクライナ", correct: true },
+                    { label: "B", text: "カナダ", correct: false },
+                    { label: "C", text: "オーストラリア", correct: false }
+                ],
+                explanation: "正解はAのウクライナ！線路を包み込む幻想的な緑のトンネルだよ！"
+            },
+            {
+                theme: "🎵 伝統楽器",
+                question: "【第12問】たくさんの弦があるウクライナの伝統的な弦楽器は？",
+                options: [
+                    { label: "A", text: "ウクレレ", correct: false },
+                    { label: "B", text: "バンドゥーラ", correct: true },
+                    { label: "C", text: "バイオリン", correct: false }
+                ],
+                explanation: "正解はBのバンドゥーラ！50本以上の弦を持つ美しい音色の楽器だよ！"
+            },
+            {
+                theme: "🪙 お金の単位",
+                question: "【第13問】ウクライナで使われている通貨（お金の単位）の名前は？",
+                options: [
+                    { label: "A", text: "ドル", correct: false },
+                    { label: "B", text: "ユーロ", correct: false },
+                    { label: "C", text: "フリヴニャ", correct: true }
+                ],
+                explanation: "正解はCのフリヴニャ！ウクライナ国内のお買い物で使われているよ！"
+            }
+        ];
+
+        let currentStageIdx = 0;
+        let score = 0;
+        let correctAnswers = 0;
+        let gameState = 'START';
+
+        const player = {
+            x: 80,
+            y: 280,
+            width: 32,
+            height: 48,
+            vx: 0,
+            vy: 0,
+            speed: 5,
+            jumpPower: -12,
+            gravity: 0.6,
+            isGrounded: false,
+            direction: 'right'
+        };
+
+        const keys = { left: false, right: false, up: false };
+
+        const doors = [
+            { label: 'A', x: 220, y: 260, width: 50, height: 70 },
+            { label: 'B', x: 420, y: 260, width: 50, height: 70 },
+            { label: 'C', x: 620, y: 260, width: 50, height: 70 }
+        ];
+
+        let expText = "";
+        let expTimer = 0;
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === ' ') {
+                keys.up = true;
+                handleEnterDoor();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === ' ') keys.up = false;
+        });
+
+        document.getElementById('btn-left').addEventListener('touchstart', (e) => { e.preventDefault(); keys.left = true; });
+        document.getElementById('btn-left').addEventListener('touchend', (e) => { e.preventDefault(); keys.left = false; });
+        document.getElementById('btn-right').addEventListener('touchstart', (e) => { e.preventDefault(); keys.right = true; });
+        document.getElementById('btn-right').addEventListener('touchend', (e) => { e.preventDefault(); keys.right = false; });
+        document.getElementById('btn-jump').addEventListener('touchstart', (e) => { 
+            e.preventDefault(); 
+            keys.up = true; 
+            handleEnterDoor();
+        });
+        document.getElementById('btn-jump').addEventListener('touchend', (e) => { e.preventDefault(); keys.up = false; });
+
+        function startGame() {
+            document.getElementById('start-overlay').classList.add('hidden');
+            document.getElementById('result-overlay').classList.add('hidden');
+            currentStageIdx = 0;
+            score = 0;
+            correctAnswers = 0;
+            resetPlayerPos();
+            gameState = 'PLAYING';
+            updateUI();
+        }
+
+        function restartGame() {
+            startGame();
+        }
+
+        function resetPlayerPos() {
+            player.x = 80;
+            player.y = 280;
+            player.vx = 0;
+            player.vy = 0;
+        }
+
+        function updateUI() {
+            document.getElementById('stage-badge').innerText = `STAGE ${currentStageIdx + 1}/${stages.length}`;
+            document.getElementById('country-title').innerText = stages[currentStageIdx].theme;
+            document.getElementById('correct-count').innerText = correctAnswers;
+            document.getElementById('score-val').innerText = score;
+        }
+
+        function handleEnterDoor() {
+            if (gameState !== 'PLAYING') return;
+
+            const currentStage = stages[currentStageIdx];
+            doors.forEach((door, idx) => {
+                if (player.x + player.width > door.x && player.x < door.x + door.width) {
+                    const selectedOpt = currentStage.options[idx];
+                    
+                    if (selectedOpt.correct) {
+                        score += 100;
+                        correctAnswers++;
+                        expText = "⭕️ 正解！ " + currentStage.explanation;
+                    } else {
+                        expText = "❌ おしい！ " + currentStage.explanation;
+                    }
+                    gameState = 'EXPLANATION';
+                    expTimer = 170;
+                    updateUI();
+                }
+            });
+        }
+
+        function update() {
+            if (gameState !== 'PLAYING') return;
+
+            if (keys.left) {
+                player.vx = -player.speed;
+                player.direction = 'left';
+            } else if (keys.right) {
+                player.vx = player.speed;
+                player.direction = 'right';
+            } else {
+                player.vx = 0;
+            }
+
+            if (keys.up && player.isGrounded) {
+                player.vy = player.jumpPower;
+                player.isGrounded = false;
+            }
+
+            player.vy += player.gravity;
+            player.x += player.vx;
+            player.y += player.vy;
+
+            const groundY = 330;
+            if (player.y + player.height >= groundY) {
+                player.y = groundY - player.height;
+                player.vy = 0;
+                player.isGrounded = true;
+            }
+
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+        }
+
+        function draw() {
+            ctx.fillStyle = '#0057b7';
+            ctx.fillRect(0, 0, canvas.width, 330);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(100, 80, 30, 0, Math.PI * 2);
+            ctx.arc(130, 70, 35, 0, Math.PI * 2);
+            ctx.arc(160, 80, 30, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#ffd700';
+            ctx.fillRect(0, 330, canvas.width, 20);
+            ctx.fillStyle = '#b8860b';
+            ctx.fillRect(0, 350, canvas.width, 100);
+
+            const stage = stages[currentStageIdx];
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(20, 15, canvas.width - 40, 75);
+            ctx.strokeStyle = '#ffd700';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(20, 15, canvas.width - 40, 75);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 17px "M PLUS Rounded 1c"';
+            ctx.textAlign = 'center';
+            ctx.fillText(stage.question, canvas.width / 2, 58);
+
+            doors.forEach((door, idx) => {
+                const opt = stage.options[idx];
+
+                ctx.fillStyle = '#1e3a8a';
+                ctx.fillRect(door.x, door.y, door.width, door.height);
+                ctx.strokeStyle = '#facc15';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(door.x, door.y, door.width, door.height);
+
+                ctx.fillStyle = '#facc15';
+                ctx.beginPath();
+                ctx.arc(door.x + 40, door.y + 35, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#facc15';
+                ctx.font = 'bold 24px "M PLUS Rounded 1c"';
+                ctx.fillText(door.label, door.x + door.width / 2, door.y - 10);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(door.x - 48, door.y - 65, 146, 45);
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(door.x - 48, door.y - 65, 146, 45);
+
+                ctx.fillStyle = '#1f2937';
+                ctx.font = 'bold 12px "M PLUS Rounded 1c"';
+                ctx.fillText(opt.text, door.x + 25, door.y - 38);
+            });
+
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(player.x, player.y + 16, player.width, 32);
+            ctx.fillStyle = '#fca5a5';
+            ctx.fillRect(player.x + 4, player.y, 24, 20);
+            ctx.fillStyle = '#dc2626';
+            ctx.fillRect(player.x, player.y - 4, 32, 10);
+
+            ctx.fillStyle = '#000000';
+            const eyeX = player.direction === 'right' ? player.x + 20 : player.x + 8;
+            ctx.fillRect(eyeX, player.y + 6, 4, 6);
+
+            if (gameState === 'EXPLANATION') {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+                ctx.fillRect(30, 110, canvas.width - 60, 210);
+                ctx.strokeStyle = '#ffd700';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(30, 110, canvas.width - 60, 210);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 17px "M PLUS Rounded 1c"';
+                ctx.fillText(expText, canvas.width / 2, 195);
+
+                ctx.fillStyle = '#93c5fd';
+                ctx.font = 'bold 14px "M PLUS Rounded 1c"';
+                ctx.fillText("次のステージへ向かっています...", canvas.width / 2, 270);
+
+                expTimer--;
+                if (expTimer <= 0) {
+                    if (currentStageIdx + 1 < stages.length) {
+                        currentStageIdx++;
+                        resetPlayerPos();
+                        gameState = 'PLAYING';
+                        updateUI();
+                    } else {
+                        endGame();
+                    }
+                }
+            }
+        }
+
+        function endGame() {
+            gameState = 'CLEAR';
+            const overlay = document.getElementById('result-overlay');
+            const icon = document.getElementById('result-icon');
+            const title = document.getElementById('result-title');
+            const msg = document.getElementById('result-msg');
+
+            icon.className = "fa-solid fa-trophy text-6xl text-yellow-400 mb-3";
+            title.innerText = "全13問ゴール！";
+            msg.innerText = `おつかれさまでした！ 13問中 ${correctAnswers} 問正解！（スコア: ${score}点）`;
+
+            overlay.classList.remove('hidden');
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+    </script>
+</body>
+</html>

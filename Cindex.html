@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中国探検！ワールドアドベンチャー（全13問）</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800&display=swap');
+        body { font-family: 'M PLUS Rounded 1c', sans-serif; touch-action: manipulation; user-select: none; }
+        canvas { image-rendering: pixelated; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center justify-center p-2 sm:p-4">
+
+    <!-- メインコンテナ -->
+    <div class="w-full max-w-4xl bg-gray-800 rounded-3xl p-4 shadow-2xl border-4 border-red-500 relative">
+        
+        <!-- ヘッダー情報 -->
+        <div class="flex justify-between items-center mb-2 px-2 text-sm sm:text-base">
+            <div class="flex items-center gap-2">
+                <span class="bg-red-500 text-white font-extrabold px-3 py-1 rounded-full text-xs sm:text-sm" id="stage-badge">STAGE 1/13</span>
+                <span class="font-bold text-yellow-300" id="country-title">🇨🇳 中国を知ろう</span>
+            </div>
+            <div class="flex items-center gap-4 font-bold">
+                <span class="text-blue-400"><i class="fa-solid fa-circle-check me-1"></i> 正解: <span id="correct-count">0</span> / 13</span>
+                <span class="text-yellow-400"><i class="fa-solid fa-star me-1"></i> SCORE: <span id="score-val">0</span></span>
+            </div>
+        </div>
+
+        <!-- Canvas ゲーム画面 -->
+        <div class="relative w-full aspect-[16/9] bg-black rounded-2xl overflow-hidden border-2 border-gray-700">
+            <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+
+            <!-- スタート・オーバーレイ -->
+            <div id="start-overlay" class="absolute inset-0 bg-black/85 flex flex-col items-center justify-center p-6 text-center z-10">
+                <div class="text-6xl mb-3 animate-bounce">🇨🇳</div>
+                <h1 class="text-2xl sm:text-4xl font-extrabold text-yellow-300 mb-2">中国探検クイズ！</h1>
+                <p class="text-xs sm:text-sm text-gray-300 mb-6 max-w-md">
+                    キャラクターを操作して正解の扉（A/B/C）に入ろう！<br>
+                    全13問のクイズに挑戦！間違えても最後まで進めるよ！（所要時間：約5〜7分）
+                </p>
+                <button onclick="startGame()" class="px-8 py-4 bg-red-600 hover:bg-red-500 text-yellow-300 font-extrabold text-lg sm:text-xl rounded-2xl shadow-lg border-2 border-yellow-400 transform active:scale-95 transition-all">
+                    冒険をはじめる！ <i class="fa-solid fa-play ms-2"></i>
+                </button>
+            </div>
+
+            <!-- 結果オーバーレイ -->
+            <div id="result-overlay" class="hidden absolute inset-0 bg-black/90 flex flex-col items-center justify-center p-6 text-center z-10">
+                <i id="result-icon" class="fa-solid fa-trophy text-6xl text-yellow-400 mb-3"></i>
+                <h2 id="result-title" class="text-3xl font-extrabold text-white mb-2">ゴール！全13問クリア！</h2>
+                <p id="result-msg" class="text-gray-300 mb-6 text-sm">中国物知りマスターになりました！</p>
+                <button onclick="restartGame()" class="px-6 py-3 bg-red-600 text-yellow-300 font-extrabold text-lg rounded-2xl shadow-lg border-2 border-yellow-400 transform active:scale-95 transition-all">
+                    もう一度あそぶ <i class="fa-solid fa-rotate-right ms-1"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- タッチ用操作ボタン（スマホ向け） -->
+        <div class="mt-4 grid grid-cols-3 gap-2 sm:hidden">
+            <button id="btn-left" class="bg-gray-700 active:bg-red-500 py-4 rounded-xl text-2xl font-bold border-b-4 border-gray-900 active:border-red-700">
+                <i class="fa-solid fa-arrow-left"></i>
+            </button>
+            <button id="btn-jump" class="bg-red-600 active:bg-red-500 text-yellow-300 py-4 rounded-xl text-2xl font-bold border-b-4 border-red-800">
+                JUMP <i class="fa-solid fa-arrow-up ms-1"></i>
+            </button>
+            <button id="btn-right" class="bg-gray-700 active:bg-red-500 py-4 rounded-xl text-2xl font-bold border-b-4 border-gray-900 active:border-red-700">
+                <i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </div>
+
+        <!-- 操作説明 (PC用) -->
+        <div class="hidden sm:flex justify-between items-center text-xs text-gray-400 mt-3 px-2">
+            <span><i class="fa-solid fa-keyboard me-1"></i> 移動: <b>[←] [→]</b> または <b>[A] [D]</b></span>
+            <span><i class="fa-solid fa-keyboard me-1"></i> ジャンプ: <b>[SPACE]</b> または <b>[↑]</b></span>
+            <span><i class="fa-solid fa-door-open me-1"></i> 扉の前で [↑] キーで入る</span>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = 800;
+        canvas.height = 450;
+
+        // 中国に関する全13問（A: 4問, B: 4問, C: 5問にバラバラ配置）
+        const stages = [
+            {
+                theme: "🏛️ 首都の知識",
+                question: "【第1問】中国の首都の名前は？",
+                options: [
+                    { label: "A", text: "シャンハイ（上海）", correct: false },
+                    { label: "B", text: "ペキン（北京）", correct: true },
+                    { label: "C", text: "ホンコン（香港）", correct: false }
+                ],
+                explanation: "正解はBのペキン（北京）！歴史的な建物や紫禁城などがある中心地だよ！"
+            },
+            {
+                theme: "🐼 有名な動物",
+                question: "【第2問】中国を象徴する、竹を食べる大人気の動物は？",
+                options: [
+                    { label: "A", text: "コアラ", correct: false },
+                    { label: "B", text: "レッサーパンダ", correct: false },
+                    { label: "C", text: "ジャイアントパンダ", correct: true }
+                ],
+                explanation: "正解はCのジャイアントパンダ！四川省などに生息していて平和の象徴だよ！"
+            },
+            {
+                theme: "🏯 世界遺産",
+                question: "【第3問】宇宙からも見えると言われる、中国の超巨大な壁の建築物は？",
+                options: [
+                    { label: "A", text: "万里の長城", correct: true },
+                    { label: "B", text: "ピラミッド", correct: false },
+                    { label: "C", text: "タージ・マハル", correct: false }
+                ],
+                explanation: "正解はAの万里の長城！長大な城壁として世界遺産に登録されているよ！"
+            },
+            {
+                theme: "🥟 伝統料理",
+                question: "【第4問】中国で正月（春節）などによく食べられる、蒸したり茹でたりする料理は？",
+                options: [
+                    { label: "A", text: "たこ焼き", correct: false },
+                    { label: "B", text: "ギョーザ", correct: true },
+                    { label: "C", text: "カレーライス", correct: false }
+                ],
+                explanation: "正解はBのギョーザ！本場では水餃子や蒸し餃子が一般的だよ！"
+            },
+            {
+                theme: "💬 言語と挨拶",
+                question: "【第5問】中国語で「こんにちは」を表す有名な挨拶は？",
+                options: [
+                    { label: "A", text: "サワディーカップ", correct: false },
+                    { label: "B", text: "アニョハセヨ", correct: false },
+                    { label: "C", text: "ニーハオ", correct: true }
+                ],
+                explanation: "正解はCのニーハオ（你好）！とても有名な挨拶だね！"
+            },
+            {
+                theme: "🍵 伝統文化",
+                question: "【第6問】中国発祥とされる、茶葉にお湯を注いで楽しむ飲物は？",
+                options: [
+                    { label: "A", text: "ウーロン茶", correct: true },
+                    { label: "B", text: "コーヒー", correct: false },
+                    { label: "C", text: "オレンジジュース", correct: false }
+                ],
+                explanation: "正解はAのウーロン茶！他にもジャスミン茶などたくさんの種類があるよ！"
+            },
+            {
+                theme: "🎆 伝統行事",
+                question: "【第7問】中国の旧暦のお正月（1月下旬〜2月頃）のことを何と呼ぶ？",
+                options: [
+                    { label: "A", text: "クリスマス", correct: false },
+                    { label: "B", text: "ハロウィン", correct: false },
+                    { label: "C", text: "シュンセツ", correct: true }
+                ],
+                explanation: "正解はCのシュンセツ(春節)！赤色の飾りや爆竹でお祝いする最大のお祭りだよ！"
+            },
+            {
+                theme: "🎨 四大発明",
+                question: "【第8問】古代中国で発明された「紙」「印刷」「火薬」と、あと1つは何？",
+                options: [
+                    { label: "A", text: "時計", correct: false },
+                    { label: "B", text: "羅針盤", correct: true },
+                    { label: "C", text: "自動車", correct: false }
+                ],
+                explanation: "正解はBの羅針盤（コンパス）！航海技術を大きく進歩させた発明だよ！"
+            },
+            {
+                theme: "🥋 伝統武術",
+                question: "【第9問】素早い動きや型が特徴的な、中国発祥の有名な武術は？",
+                options: [
+                    { label: "A", text: "カンフー", correct: true },
+                    { label: "B", text: "テコンドー", correct: false },
+                    { label: "C", text: "ボクシング", correct: false }
+                ],
+                explanation: "正解はAのカンフー（功夫）！長い歴史を持つ格闘術だよ！"
+            },
+            {
+                theme: "🪙 お金の単位",
+                question: "【第10問】中国で使われている通貨（お金の単位）の名前は？",
+                options: [
+                    { label: "A", text: "ペソ", correct: false },
+                    { label: "B", text: "ウォン", correct: false },
+                    { label: "C", text: "ゲン", correct: true }
+                ],
+                explanation: "正解はCの元（げん・人民元）！買い物ではスマホ決済も大人気だよ！"
+            },
+            {
+                theme: "🏮 伝統の服",
+                question: "【第11問】立ち襟や横のボタンが特徴的な、中国の伝統的なドレスは？",
+                options: [
+                    { label: "A", text: "チャイナドレス", correct: true },
+                    { label: "B", text: "着物", correct: false },
+                    { label: "C", text: "ドレス", correct: false }
+                ],
+                explanation: "正解はAのチャイナドレス！刺繍が綺麗で華やかな衣装だよ！"
+            },
+            {
+                theme: "🏙️ 大都市のシンボル",
+                question: "【第12問】上海（シャンハイ）にある有名な高層電波タワーの愛称は？",
+                options: [
+                    { label: "A", text: "エッフェルタワー", correct: false },
+                    { label: "B", text: "東洋の真珠", correct: true },
+                    { label: "C", text: "ビッグベン", correct: false }
+                ],
+                explanation: "正解はBの東洋の真珠（東方明珠塔）！まん丸い球体が目印の塔だよ！"
+            },
+            {
+                theme: "🐉 伝説の生き物",
+                question: "【第13問】中国の伝統文化で、幸運や強さのシンボルとされる架空の生き物は？",
+                options: [
+                    { label: "A", text: "ユニコーン", correct: false },
+                    { label: "B", text: "グリフィン", correct: false },
+                    { label: "C", text: "リュウ", correct: true }
+                ],
+                explanation: "正解はCのリュウ(龍)！空を飛ぶ神様として大切にされているよ！"
+            }
+        ];
+
+        let currentStageIdx = 0;
+        let score = 0;
+        let correctAnswers = 0;
+        let gameState = 'START';
+
+        const player = {
+            x: 80,
+            y: 280,
+            width: 32,
+            height: 48,
+            vx: 0,
+            vy: 0,
+            speed: 5,
+            jumpPower: -12,
+            gravity: 0.6,
+            isGrounded: false,
+            direction: 'right'
+        };
+
+        const keys = { left: false, right: false, up: false };
+
+        const doors = [
+            { label: 'A', x: 220, y: 260, width: 50, height: 70 },
+            { label: 'B', x: 420, y: 260, width: 50, height: 70 },
+            { label: 'C', x: 620, y: 260, width: 50, height: 70 }
+        ];
+
+        let expText = "";
+        let expTimer = 0;
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === ' ') {
+                keys.up = true;
+                handleEnterDoor();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === ' ') keys.up = false;
+        });
+
+        document.getElementById('btn-left').addEventListener('touchstart', (e) => { e.preventDefault(); keys.left = true; });
+        document.getElementById('btn-left').addEventListener('touchend', (e) => { e.preventDefault(); keys.left = false; });
+        document.getElementById('btn-right').addEventListener('touchstart', (e) => { e.preventDefault(); keys.right = true; });
+        document.getElementById('btn-right').addEventListener('touchend', (e) => { e.preventDefault(); keys.right = false; });
+        document.getElementById('btn-jump').addEventListener('touchstart', (e) => { 
+            e.preventDefault(); 
+            keys.up = true; 
+            handleEnterDoor();
+        });
+        document.getElementById('btn-jump').addEventListener('touchend', (e) => { e.preventDefault(); keys.up = false; });
+
+        function startGame() {
+            document.getElementById('start-overlay').classList.add('hidden');
+            document.getElementById('result-overlay').classList.add('hidden');
+            currentStageIdx = 0;
+            score = 0;
+            correctAnswers = 0;
+            resetPlayerPos();
+            gameState = 'PLAYING';
+            updateUI();
+        }
+
+        function restartGame() {
+            startGame();
+        }
+
+        function resetPlayerPos() {
+            player.x = 80;
+            player.y = 280;
+            player.vx = 0;
+            player.vy = 0;
+        }
+
+        function updateUI() {
+            document.getElementById('stage-badge').innerText = `STAGE ${currentStageIdx + 1}/${stages.length}`;
+            document.getElementById('country-title').innerText = stages[currentStageIdx].theme;
+            document.getElementById('correct-count').innerText = correctAnswers;
+            document.getElementById('score-val').innerText = score;
+        }
+
+        function handleEnterDoor() {
+            if (gameState !== 'PLAYING') return;
+
+            const currentStage = stages[currentStageIdx];
+            doors.forEach((door, idx) => {
+                if (player.x + player.width > door.x && player.x < door.x + door.width) {
+                    const selectedOpt = currentStage.options[idx];
+                    
+                    if (selectedOpt.correct) {
+                        score += 100;
+                        correctAnswers++;
+                        expText = "⭕️ 正解！ " + currentStage.explanation;
+                    } else {
+                        expText = "❌ おしい！ " + currentStage.explanation;
+                    }
+                    gameState = 'EXPLANATION';
+                    expTimer = 170;
+                    updateUI();
+                }
+            });
+        }
+
+        function update() {
+            if (gameState !== 'PLAYING') return;
+
+            if (keys.left) {
+                player.vx = -player.speed;
+                player.direction = 'left';
+            } else if (keys.right) {
+                player.vx = player.speed;
+                player.direction = 'right';
+            } else {
+                player.vx = 0;
+            }
+
+            if (keys.up && player.isGrounded) {
+                player.vy = player.jumpPower;
+                player.isGrounded = false;
+            }
+
+            player.vy += player.gravity;
+            player.x += player.vx;
+            player.y += player.vy;
+
+            const groundY = 330;
+            if (player.y + player.height >= groundY) {
+                player.y = groundY - player.height;
+                player.vy = 0;
+                player.isGrounded = true;
+            }
+
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+        }
+
+        function draw() {
+            // 背景
+            ctx.fillStyle = '#991b1b';
+            ctx.fillRect(0, 0, canvas.width, 330);
+
+            // 雲
+            ctx.fillStyle = '#fef08a';
+            ctx.beginPath();
+            ctx.arc(100, 80, 25, 0, Math.PI * 2);
+            ctx.arc(125, 70, 30, 0, Math.PI * 2);
+            ctx.arc(150, 80, 25, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 地面
+            ctx.fillStyle = '#facc15';
+            ctx.fillRect(0, 330, canvas.width, 15);
+            ctx.fillStyle = '#7f1d1d';
+            ctx.fillRect(0, 345, canvas.width, 105);
+
+            // 問題ボード
+            const stage = stages[currentStageIdx];
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.fillRect(20, 15, canvas.width - 40, 75);
+            ctx.strokeStyle = '#facc15';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(20, 15, canvas.width - 40, 75);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 17px "M PLUS Rounded 1c"';
+            ctx.textAlign = 'center';
+            ctx.fillText(stage.question, canvas.width / 2, 58);
+
+            // 扉と選択肢
+            doors.forEach((door, idx) => {
+                const opt = stage.options[idx];
+
+                ctx.fillStyle = '#b91c1c';
+                ctx.fillRect(door.x, door.y, door.width, door.height);
+                ctx.strokeStyle = '#facc15';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(door.x, door.y, door.width, door.height);
+
+                ctx.fillStyle = '#facc15';
+                ctx.beginPath();
+                ctx.arc(door.x + 40, door.y + 35, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#facc15';
+                ctx.font = 'bold 24px "M PLUS Rounded 1c"';
+                ctx.fillText(door.label, door.x + door.width / 2, door.y - 10);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(door.x - 48, door.y - 65, 146, 45);
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(door.x - 48, door.y - 65, 146, 45);
+
+                ctx.fillStyle = '#1f2937';
+                ctx.font = 'bold 12px "M PLUS Rounded 1c"';
+                ctx.fillText(opt.text, door.x + 25, door.y - 38);
+            });
+
+            // プレイヤー
+            ctx.fillStyle = '#eab308';
+            ctx.fillRect(player.x, player.y + 16, player.width, 32);
+            ctx.fillStyle = '#fef08a';
+            ctx.fillRect(player.x + 4, player.y, 24, 20);
+            ctx.fillStyle = '#ca8a04';
+            ctx.fillRect(player.x, player.y - 4, 32, 10);
+
+            ctx.fillStyle = '#000000';
+            const eyeX = player.direction === 'right' ? player.x + 20 : player.x + 8;
+            ctx.fillRect(eyeX, player.y + 6, 4, 6);
+
+            // 解説表示
+            if (gameState === 'EXPLANATION') {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+                ctx.fillRect(30, 110, canvas.width - 60, 210);
+                ctx.strokeStyle = '#facc15';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(30, 110, canvas.width - 60, 210);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 17px "M PLUS Rounded 1c"';
+                ctx.fillText(expText, canvas.width / 2, 195);
+
+                ctx.fillStyle = '#fef08a';
+                ctx.font = 'bold 14px "M PLUS Rounded 1c"';
+                ctx.fillText("次のステージへ向かっています...", canvas.width / 2, 270);
+
+                expTimer--;
+                if (expTimer <= 0) {
+                    if (currentStageIdx + 1 < stages.length) {
+                        currentStageIdx++;
+                        resetPlayerPos();
+                        gameState = 'PLAYING';
+                        updateUI();
+                    } else {
+                        endGame();
+                    }
+                }
+            }
+        }
+
+        function endGame() {
+            gameState = 'CLEAR';
+            const overlay = document.getElementById('result-overlay');
+            const icon = document.getElementById('result-icon');
+            const title = document.getElementById('result-title');
+            const msg = document.getElementById('result-msg');
+
+            icon.className = "fa-solid fa-trophy text-6xl text-yellow-400 mb-3";
+            title.innerText = "全13問ゴール！";
+            msg.innerText = `おつかれさまでした！ 13問中 ${correctAnswers} 問正解！（スコア: ${score}点）`;
+
+            overlay.classList.remove('hidden');
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+    </script>
+</body>
+</html>
